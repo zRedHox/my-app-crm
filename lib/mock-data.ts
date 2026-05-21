@@ -232,6 +232,7 @@ export const budgetRanges = [
 ] as const;
 
 export const productInterests = [
+  "KM Buddy",
   "Supplement",
   "Cosmetic",
   "Other",

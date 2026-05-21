@@ -8,27 +8,34 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { FormSection } from "@/components/leads/form-section";
-import { createLead } from "@/lib/api/leads";
-import { getMe } from "@/lib/api/users";
+import { updateLead } from "@/lib/api/leads";
 import { ApiError } from "@/lib/api/client";
-import { isAuthenticated } from "@/lib/auth/token";
-import { useIsAuthenticated } from "@/lib/auth/use-is-authenticated";
+import type { LeadOut } from "@/lib/api/types";
 import {
   validateLeadForm,
   formDataToLeadPayload,
+  leadToFormDefaults,
   type LeadFormErrors,
 } from "@/lib/leads/form";
-import { budgetRanges, productInterests } from "@/lib/mock-data";
+import { budgetRanges, productInterests, statusLabels } from "@/lib/mock-data";
 
 const budgetOptions = budgetRanges.map((b) => ({ value: b.value, label: b.label }));
 const productOptions = productInterests.map((p) => ({ value: p, label: p }));
+const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({
+  value,
+  label,
+}));
 
-export function CreateLeadForm() {
+interface EditLeadFormProps {
+  lead: LeadOut;
+}
+
+export function EditLeadForm({ lead }: EditLeadFormProps) {
   const router = useRouter();
+  const defaults = leadToFormDefaults(lead);
   const [errors, setErrors] = useState<LeadFormErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const isAuthed = useIsAuthenticated();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,21 +49,12 @@ export function CreateLeadForm() {
     setSubmitting(true);
     try {
       const payload = formDataToLeadPayload(form);
-
-      if (isAuthenticated()) {
-        try {
-          const me = await getMe();
-          payload.assigned_user_id = me.id;
-        } catch {
-          /* continue without assignment if profile fetch fails */
-        }
-      }
-
-      const created = await createLead(payload);
-      router.push(`/leads?created=1&id=${created.id}`);
+      await updateLead(lead.id, payload);
+      router.push(`/leads/${lead.id}?updated=1`);
+      router.refresh();
     } catch (err) {
       setSubmitError(
-        err instanceof ApiError ? err.message : "Failed to create lead. Please try again.",
+        err instanceof ApiError ? err.message : "Failed to update lead. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -65,11 +63,6 @@ export function CreateLeadForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {!isAuthed && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Sign in before creating a lead so it appears in your leads list.
-        </p>
-      )}
       {submitError && (
         <div
           role="alert"
@@ -89,6 +82,7 @@ export function CreateLeadForm() {
             <Input
               label="Full name"
               name="fullName"
+              defaultValue={defaults.fullName}
               placeholder="e.g. Somchai Prasert"
               required
               error={errors.fullName}
@@ -98,6 +92,7 @@ export function CreateLeadForm() {
             label="Email address"
             name="email"
             type="email"
+            defaultValue={defaults.email}
             placeholder="name@company.com"
             autoComplete="email"
             error={errors.email}
@@ -105,12 +100,14 @@ export function CreateLeadForm() {
           <Input
             label="Contact person"
             name="contactPerson"
+            defaultValue={defaults.contactPerson}
             placeholder="e.g. HR Manager, Owner"
           />
           <Input
             label="Phone number"
             name="phone"
             type="tel"
+            defaultValue={defaults.phone}
             placeholder="+66 81 234 5678"
             autoComplete="tel"
             error={errors.phone}
@@ -119,6 +116,7 @@ export function CreateLeadForm() {
             <Input
               label="LINE ID"
               name="lineId"
+              defaultValue={defaults.lineId}
               placeholder="@username or LINE ID"
             />
           </div>
@@ -132,28 +130,30 @@ export function CreateLeadForm() {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-              label="Company name"
-              name="companyName"
-              placeholder="ชื่อบริษัท..."
-            />
-          <Input
             label="Job position"
             name="jobPosition"
+            defaultValue={defaults.jobPosition}
             placeholder="e.g. Sales Director, CEO"
           />
           <Select
             label="Product interest"
             name="productInterest"
-            defaultValue=""
+            defaultValue={defaults.productInterest}
             options={productOptions}
             placeholder="Select product interest"
             error={errors.productInterest}
+          />
+          <Select
+            label="Status"
+            name="status"
+            defaultValue={defaults.status}
+            options={statusOptions}
           />
           <div className="sm:col-span-2">
             <Select
               label="Budget range"
               name="budgetRange"
-              defaultValue=""
+              defaultValue={defaults.budgetRange}
               options={budgetOptions}
               placeholder="Select budget range"
               error={errors.budgetRange}
@@ -170,6 +170,7 @@ export function CreateLeadForm() {
         <Textarea
           label="Notes"
           name="notes"
+          defaultValue={defaults.notes}
           placeholder="Meeting notes, preferences, next steps..."
           rows={5}
         />
@@ -179,13 +180,13 @@ export function CreateLeadForm() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.back()}
+          onClick={() => router.push(`/leads/${lead.id}`)}
           disabled={submitting}
         >
           Cancel
         </Button>
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Creating…" : "Create lead"}
+          {submitting ? "Saving…" : "Save changes"}
         </Button>
       </div>
     </form>

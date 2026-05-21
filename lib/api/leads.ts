@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 import { getAccessToken } from "@/lib/auth/token";
-import type { LeadCreate, LeadOut } from "./types";
+import type { LeadCreate, LeadOut, LeadUpdate } from "./types";
 
 export interface GetLeadsParams {
   search?: string;
@@ -35,6 +35,17 @@ export async function deleteLead(leadId: number | string): Promise<void> {
   });
 }
 
+export async function updateLead(
+  leadId: number | string,
+  data: LeadUpdate,
+): Promise<LeadOut> {
+  return apiClient<LeadOut>(`/api/v1/leads/${leadId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+    auth: true,
+  });
+}
+
 export async function createLead(data: LeadCreate): Promise<LeadOut> {
   const hasToken = Boolean(getAccessToken());
   return apiClient<LeadOut>("/api/v1/leads", {
@@ -44,22 +55,4 @@ export async function createLead(data: LeadCreate): Promise<LeadOut> {
   });
 }
 
-export function formDataToLeadCreate(form: FormData): LeadCreate {
-  const str = (key: string) => {
-    const v = String(form.get(key) ?? "").trim();
-    return v || null;
-  };
-
-  return {
-    name: str("fullName"),
-    email: str("email"),
-    contact_name: str("contactPerson"),
-    phone: str("phone"),
-    line_id: str("lineId"),
-    job_position: str("jobPosition"),
-    product_interest: str("productInterest"),
-    customer_budget: str("budgetRange") as LeadCreate["customer_budget"],
-    internal_notes: str("notes"),
-    status: "new",
-  };
-}
+export { formDataToLeadPayload as formDataToLeadCreate } from "@/lib/leads/form";

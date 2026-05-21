@@ -34,6 +34,8 @@ export interface LeadOut extends LeadCreate {
   updated_at?: string | null;
 }
 
+export type LeadUpdate = LeadCreate;
+
 export interface ValidationErrorItem {
   loc: (string | number)[];
   msg: string;

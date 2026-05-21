@@ -11,6 +11,7 @@ import {
   Phone,
   User,
   Loader2,
+  Pencil,
   Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -121,6 +122,10 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
         description={lead.company_name ?? lead.contact_name ?? undefined}
         action={
           <div className="flex flex-wrap gap-2">
+            <ButtonLink href={`/leads/${leadId}/edit`} variant="outline" size="sm" className="gap-1.5">
+              <Pencil className="h-4 w-4" />
+              Edit
+            </ButtonLink>
             <ButtonLink href="/chat" variant="outline" size="sm">
               Message
             </ButtonLink>
