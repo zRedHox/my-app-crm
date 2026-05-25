@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { Loader2, RefreshCw, Send } from "lucide-react";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { useLineChat } from "@/hooks/use-line-chat";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,6 +13,7 @@ import {
   platformLabels,
 } from "@/lib/mock-data";
 import type { ChatPlatform } from "@/lib/types";
+import type { LineConversation } from "@/lib/line/types";
 
 const filters: { id: ChatPlatform | "all"; label: string }[] = [
   { id: "all", label: "All" },
@@ -20,164 +22,365 @@ const filters: { id: ChatPlatform | "all"; label: string }[] = [
   { id: "tiktok", label: "TikTok" },
 ];
 
+type ConversationItem =
+  | { source: "line"; data: LineConversation }
+  | { source: "mock"; data: (typeof chatConversations)[number] };
+
 export function ChatCenter() {
   const [filter, setFilter] = useState<ChatPlatform | "all">("all");
   const [selectedId, setSelectedId] = useState("");
+  const [draft, setDraft] = useState("");
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
-  const filtered =
-    filter === "all"
-      ? chatConversations
+  const {
+    conversations: lineConversations,
+    loading: lineLoading,
+    error: lineError,
+    sending,
+    refresh,
+    sendMessage,
+  } = useLineChat();
+
+  const mockFiltered =
+    filter === "all" || filter === "line"
+      ? []
       : chatConversations.filter((c) => c.platform === filter);
 
-  const activeId =
-    selectedId || (isDesktop ? (chatConversations[0]?.id ?? "") : "");
+  const lineFiltered =
+    filter === "all" || filter === "line" ? lineConversations : [];
 
-  const active = activeId
-    ? chatConversations.find((c) => c.id === activeId)
-    : undefined;
+  const listItems: ConversationItem[] = [
+    ...lineFiltered.map((data) => ({ source: "line" as const, data })),
+    ...(filter === "all"
+      ? chatConversations
+          .filter((c) => c.platform !== "line")
+          .map((data) => ({ source: "mock" as const, data }))
+      : mockFiltered.map((data) => ({ source: "mock" as const, data }))),
+  ];
+
+  const activeLine = lineConversations.find((c) => c.id === selectedId);
+  const activeMock = chatConversations.find((c) => c.id === selectedId);
+
+  const defaultId =
+    listItems[0]?.source === "line"
+      ? listItems[0].data.id
+      : listItems[0]?.source === "mock"
+        ? listItems[0].data.id
+        : "";
+
+  const activeId = selectedId || (isDesktop ? defaultId : "");
+  const isLineActive = Boolean(activeLine && activeLine.id === activeId);
+  const isMockActive = Boolean(activeMock && activeMock.id === activeId);
+
+  async function handleSend() {
+    if (!draft.trim() || !activeLine || sending) return;
+    const text = draft.trim();
+    setDraft("");
+    try {
+      await sendMessage(activeLine.lineUserId, text);
+    } catch {
+      setDraft(text);
+    }
+  }
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col gap-3 md:h-[calc(100dvh-6rem)] md:flex-row md:gap-4">
-      {/* Conversation list */}
       <Card
         padding="none"
         className={`flex flex-col overflow-hidden md:w-80 lg:w-96 ${
           selectedId ? "hidden md:flex" : "flex flex-1"
         }`}
       >
-        {/* Platform filters */}
-        <div className="flex gap-1.5 overflow-x-auto border-b border-slate-100 p-3 scroll-thin">
-          {filters.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                filter === f.id
-                  ? "bg-[#1d4ed8] text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <ul className="flex-1 overflow-y-auto scroll-thin">
-          {filtered.map((conv) => (
-            <li key={conv.id}>
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+          <div className="flex gap-1.5 overflow-x-auto scroll-thin">
+            {filters.map((f) => (
               <button
+                key={f.id}
                 type="button"
-                onClick={() => setSelectedId(conv.id)}
-                className={`flex w-full items-start gap-3 border-b border-slate-50 px-4 py-3 text-left transition hover:bg-slate-50 ${
-                  active?.id === conv.id ? "bg-blue-50" : ""
+                onClick={() => setFilter(f.id)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  filter === f.id
+                    ? "bg-[#1d4ed8] text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                <Avatar initials={conv.avatar} size="md" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-medium text-slate-900">
-                      {conv.customerName}
-                    </span>
-                    <span className="shrink-0 text-[10px] text-slate-400">
-                      {conv.lastMessageAt}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-1.5">
-                    <Badge className={`text-[9px] px-1.5 py-0 ${platformColors[conv.platform]}`}>
-                      {platformLabels[conv.platform]}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 truncate text-xs text-slate-500">{conv.lastMessage}</p>
-                </div>
-                {conv.unread > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                    {conv.unread}
-                  </span>
-                )}
+                {f.label}
               </button>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+            aria-label="Refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${lineLoading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+
+        {lineError && (
+          <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">
+            LINE: {lineError}
+          </p>
+        )}
+
+        {lineLoading && listItems.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center py-12 text-slate-500">
+            <Loader2 className="h-6 w-6 animate-spin text-[#1d4ed8]" />
+          </div>
+        ) : listItems.length === 0 ? (
+          <p className="px-4 py-12 text-center text-sm text-slate-500">
+            No conversations yet. Messages appear when LINE webhook receives events.
+          </p>
+        ) : (
+          <ul className="flex-1 overflow-y-auto scroll-thin">
+            {listItems.map((item) => {
+              if (item.source === "line") {
+                const conv = item.data;
+                return (
+                  <li key={conv.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(conv.id)}
+                      className={`flex w-full items-start gap-3 border-b border-slate-50 px-4 py-3 text-left transition hover:bg-slate-50 ${
+                        activeId === conv.id ? "bg-blue-50" : ""
+                      }`}
+                    >
+                      <Avatar initials={conv.avatar} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate font-medium text-slate-900">
+                            {conv.customerName}
+                          </span>
+                          <span className="shrink-0 text-[10px] text-slate-400">
+                            {conv.lastMessageAt}
+                          </span>
+                        </div>
+                        <Badge
+                          className={`mt-0.5 text-[9px] px-1.5 py-0 ${platformColors.line}`}
+                        >
+                          {platformLabels.line}
+                        </Badge>
+                        <p className="mt-1 truncate text-xs text-slate-500">
+                          {conv.lastMessage}
+                        </p>
+                      </div>
+                      {conv.unread > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                          {conv.unread}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              }
+
+              const conv = item.data;
+              return (
+                <li key={conv.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(conv.id)}
+                    className={`flex w-full items-start gap-3 border-b border-slate-50 px-4 py-3 text-left transition hover:bg-slate-50 ${
+                      activeId === conv.id ? "bg-blue-50" : ""
+                    }`}
+                  >
+                    <Avatar initials={conv.avatar} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-medium text-slate-900">
+                          {conv.customerName}
+                        </span>
+                        <span className="shrink-0 text-[10px] text-slate-400">
+                          {conv.lastMessageAt}
+                        </span>
+                      </div>
+                      <Badge
+                        className={`mt-0.5 text-[9px] px-1.5 py-0 ${platformColors[conv.platform]}`}
+                      >
+                        {platformLabels[conv.platform]}
+                      </Badge>
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {conv.lastMessage}
+                      </p>
+                    </div>
+                    {conv.unread > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                        {conv.unread}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Card>
 
-      {/* Chat thread */}
-      {active ? (
+      {isLineActive && activeLine ? (
         <Card
           padding="none"
           className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
             !selectedId && !isDesktop ? "hidden" : ""
           }`}
         >
-          {/* Thread header */}
-          <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-            <button
-              type="button"
-              onClick={() => setSelectedId("")}
-              className="text-sm text-[#1d4ed8] md:hidden"
-            >
-              ← Back
-            </button>
-            <Avatar initials={active.avatar} />
-            <div>
-              <p className="font-medium text-slate-900">{active.customerName}</p>
-              <Badge className={`mt-0.5 text-[10px] ${platformColors[active.platform]}`}>
-                {platformLabels[active.platform]}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 space-y-3 overflow-y-auto p-4 scroll-thin">
-            {active.messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.sender === "agent" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm sm:max-w-[70%] ${
-                    msg.sender === "agent"
-                      ? "rounded-br-md bg-[#1d4ed8] text-white"
-                      : "rounded-bl-md bg-slate-100 text-slate-800"
-                  }`}
-                >
-                  <p>{msg.text}</p>
-                  <p
-                    className={`mt-1 text-[10px] ${
-                      msg.sender === "agent" ? "text-blue-200" : "text-slate-400"
-                    }`}
-                  >
-                    {msg.timestamp}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Compose */}
-          <div className="border-t border-slate-100 p-3">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Type a message..."
-                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-[#1d4ed8] focus:ring-2 focus:ring-blue-100"
-              />
-              <button
-                type="button"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1d4ed8] text-white transition hover:bg-[#1e40af]"
-                aria-label="Send message"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          <ThreadHeader
+            name={activeLine.customerName}
+            platform="line"
+            onBack={() => setSelectedId("")}
+          />
+          <MessageList
+            messages={activeLine.messages.map((m) => ({
+              id: m.id,
+              text: m.text,
+              sender: m.sender,
+              timestamp: m.timestamp,
+            }))}
+          />
+          <ComposeBar
+            value={draft}
+            onChange={setDraft}
+            onSend={handleSend}
+            disabled={sending}
+            placeholder="Reply via LINE…"
+          />
+        </Card>
+      ) : isMockActive && activeMock ? (
+        <Card
+          padding="none"
+          className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
+            !selectedId && !isDesktop ? "hidden" : ""
+          }`}
+        >
+          <ThreadHeader
+            name={activeMock.customerName}
+            platform={activeMock.platform}
+            onBack={() => setSelectedId("")}
+          />
+          <MessageList messages={activeMock.messages} />
+          <ComposeBar
+            value={draft}
+            onChange={setDraft}
+            onSend={() => {}}
+            disabled
+            placeholder="Mock channel — send not connected"
+          />
         </Card>
       ) : (
         <Card className="hidden flex-1 items-center justify-center md:flex">
           <p className="text-slate-400">Select a conversation</p>
         </Card>
       )}
+    </div>
+  );
+}
+
+function ThreadHeader({
+  name,
+  platform,
+  onBack,
+}: {
+  name: string;
+  platform: ChatPlatform;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+      <button
+        type="button"
+        onClick={onBack}
+        className="text-sm text-[#1d4ed8] md:hidden"
+      >
+        ← Back
+      </button>
+      <Avatar initials={name.slice(0, 2).toUpperCase()} />
+      <div>
+        <p className="font-medium text-slate-900">{name}</p>
+        <Badge className={`mt-0.5 text-[10px] ${platformColors[platform]}`}>
+          {platformLabels[platform]}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+function MessageList({
+  messages,
+}: {
+  messages: { id: string; text: string; sender: string; timestamp: string }[];
+}) {
+  return (
+    <div className="flex-1 space-y-3 overflow-y-auto p-4 scroll-thin">
+      {messages.map((msg) => (
+        <div
+          key={msg.id}
+          className={`flex ${msg.sender === "agent" ? "justify-end" : "justify-start"}`}
+        >
+          <div
+            className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm sm:max-w-[70%] ${
+              msg.sender === "agent"
+                ? "rounded-br-md bg-[#1d4ed8] text-white"
+                : "rounded-bl-md bg-slate-100 text-slate-800"
+            }`}
+          >
+            <p>{msg.text}</p>
+            <p
+              className={`mt-1 text-[10px] ${
+                msg.sender === "agent" ? "text-blue-200" : "text-slate-400"
+              }`}
+            >
+              {msg.timestamp}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ComposeBar({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+  disabled?: boolean;
+  placeholder: string;
+}) {
+  return (
+    <div className="border-t border-slate-100 p-3">
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSend();
+        }}
+      >
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-[#1d4ed8] focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+        />
+        <button
+          type="submit"
+          disabled={disabled || !value.trim()}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1d4ed8] text-white transition hover:bg-[#1e40af] disabled:opacity-50"
+          aria-label="Send message"
+        >
+          {disabled ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
+      </form>
     </div>
   );
 }
