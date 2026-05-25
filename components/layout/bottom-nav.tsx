@@ -13,7 +13,8 @@ export function BottomNav() {
         {mainNav.map(({ label, href, icon: Icon }) => {
           const active =
             pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
-          const shortLabel = label === "Chat Center" ? "Chat" : label;
+          const shortLabel =
+            label === "Chat Center" ? "Chat" : label === "Settings" ? "Settings" : label;
           return (
             <Link
               key={href}

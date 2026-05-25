@@ -47,19 +47,26 @@ export async function POST(request: Request) {
   }
 }
 
+function isLocalAppUrl(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url);
+}
+
 export async function GET(request: Request) {
   const origin = new URL(request.url).origin;
-  let webhookUrl = `${origin}/api/line/webhook`;
+  const webhookUrlFromRequest = `${origin}/api/line/webhook`;
+  let webhookUrl = webhookUrlFromRequest;
 
   try {
     const config = getLineConfig();
-    webhookUrl = getWebhookUrl(config.appUrl);
+    const fromEnv = getWebhookUrl(config.appUrl);
+    webhookUrl = isLocalAppUrl(fromEnv) ? webhookUrlFromRequest : fromEnv;
   } catch {
-    /* show request origin when env not fully set */
+    /* use request origin when env not fully set */
   }
 
   const configured = Boolean(
-    process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.LINE_CHANNEL_SECRET,
+    process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim() &&
+      process.env.LINE_CHANNEL_SECRET?.trim(),
   );
 
   return Response.json({

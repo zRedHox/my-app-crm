@@ -3,6 +3,7 @@ import {
   Users,
   Kanban,
   MessageCircle,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,4 +18,5 @@ export const mainNav: NavItem[] = [
   { label: "Leads", href: "/leads", icon: Users },
   { label: "Pipeline", href: "/pipeline", icon: Kanban },
   { label: "Chat Center", href: "/chat", icon: MessageCircle },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];

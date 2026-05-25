@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Copy, Check } from "lucide-react";
+import { Card } from "@/components/ui/card";
 
-export function LineSetupBanner() {
+export function LineWebhookSetup() {
   const [info, setInfo] = useState<{
     webhook_url: string;
     status: string;
@@ -17,8 +18,6 @@ export function LineSetupBanner() {
       .catch(() => setInfo(null));
   }, []);
 
-  if (!info) return null;
-
   async function copyUrl() {
     if (!info?.webhook_url) return;
     await navigator.clipboard.writeText(info.webhook_url);
@@ -26,13 +25,21 @@ export function LineSetupBanner() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  if (!info) {
+    return (
+      <Card className="text-sm text-slate-500">
+        Could not load LINE webhook status. Check server env and try again.
+      </Card>
+    );
+  }
+
   return (
-    <div className="mb-4 rounded-xl border border-[#06C755]/30 bg-[#06C755]/5 px-4 py-3 text-sm">
+    <Card className="border-[#06C755]/30 bg-[#06C755]/5">
       <p className="font-medium text-slate-800">LINE webhook (this app)</p>
       <p className="mt-1 text-xs text-slate-600">
         Paste this URL in LINE Developers → Messaging API → Webhook URL
       </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <code className="flex-1 break-all rounded-lg bg-white px-2 py-1.5 text-xs text-slate-800">
           {info.webhook_url}
         </code>
@@ -54,6 +61,10 @@ export function LineSetupBanner() {
           {info.status === "ready" ? "Configured" : "Set .env.local"}
         </span>
       </div>
-    </div>
+      <p className="mt-3 text-xs text-slate-500">
+        Required env: LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET,
+        NEXT_PUBLIC_APP_URL
+      </p>
+    </Card>
   );
 }

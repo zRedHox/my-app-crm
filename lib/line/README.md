@@ -25,6 +25,21 @@ Chat Center
 5. Open Chat Center → copy webhook URL → paste in LINE Developers Console
 6. Enable **Use webhook** in LINE Console
 
+### Production (e.g. https://crm.ecobz.team)
+
+Set these in your host’s **Environment variables** (Vercel, Docker, PM2, etc.), then **redeploy**:
+
+| Variable | Example |
+|----------|---------|
+| `LINE_CHANNEL_ACCESS_TOKEN` | from LINE Developers → Messaging API |
+| `LINE_CHANNEL_SECRET` | from LINE Developers → Basic settings |
+| `NEXT_PUBLIC_APP_URL` | `https://crm.ecobz.team` |
+| `NEXT_PUBLIC_API_URL` | `https://backend.ecobz.team` |
+
+`NEXT_PUBLIC_*` values are applied at **build time** — set them before deploy, or trigger a new build after changing them.
+
+Check: open `https://crm.ecobz.team/api/line/webhook` — you want `"status":"ready"` and `webhook_url` ending with `/api/line/webhook` on your domain.
+
 ### Local dev with ngrok
 
 ```bash
