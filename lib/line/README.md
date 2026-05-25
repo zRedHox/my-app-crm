@@ -40,6 +40,27 @@ Set these in your host’s **Environment variables** (Vercel, Docker, PM2, etc.)
 
 Check: open `https://crm.ecobz.team/api/line/webhook` — you want `"status":"ready"` and `webhook_url` ending with `/api/line/webhook` on your domain.
 
+### PM2 (crm.ecobz.team)
+
+PM2 does **not** read `.env.local` from your laptop. On the **server**, in the app folder:
+
+```bash
+cp .env.example .env.production
+nano .env.production   # paste LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, NEXT_PUBLIC_APP_URL, etc.
+npm run build
+pm2 delete my-app-crm 2>/dev/null || true
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+Confirm env reached the process (no secrets printed, only true/false):
+
+```bash
+node --env-file=.env.production -e "console.log('token', !!process.env.LINE_CHANNEL_ACCESS_TOKEN, 'secret', !!process.env.LINE_CHANNEL_SECRET)"
+```
+
+If that prints `token true secret true` but the app still fails, you started PM2 with `npm start` instead of `ecosystem.config.cjs` — use the ecosystem file so `--env-file` is applied.
+
 ### Local dev with ngrok
 
 ```bash
