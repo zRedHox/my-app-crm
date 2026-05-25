@@ -9,9 +9,14 @@ export const LINE_POLL_INTERVAL_MS = Number(
   process.env.NEXT_PUBLIC_LINE_POLL_INTERVAL_MS ?? 10_000,
 );
 
-/** Backend GET /line/messages defaults to limit=100 (oldest only). */
-export const LINE_MESSAGES_FETCH_LIMIT = Number(
-  process.env.NEXT_PUBLIC_LINE_MESSAGES_FETCH_LIMIT ?? 2_000,
+/** Inbox: recent messages loaded on Chat Center open (keep small for speed) */
+export const LINE_INBOX_FETCH_LIMIT = Number(
+  process.env.NEXT_PUBLIC_LINE_INBOX_FETCH_LIMIT ?? 400,
+);
+
+/** Thread open: how far back to scan for one user's history */
+export const LINE_THREAD_SCAN_LIMIT = Number(
+  process.env.NEXT_PUBLIC_LINE_THREAD_SCAN_LIMIT ?? 2_500,
 );
 
 /** Stored in backend `provider` field */

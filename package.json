@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:line-env": "node scripts/check-line-env.cjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",
