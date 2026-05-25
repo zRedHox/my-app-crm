@@ -69,10 +69,22 @@ export async function GET(request: Request) {
       process.env.LINE_CHANNEL_SECRET?.trim(),
   );
 
+  const envStatus = {
+    LINE_CHANNEL_ACCESS_TOKEN: Boolean(
+      process.env.LINE_CHANNEL_ACCESS_TOKEN?.trim(),
+    ),
+    LINE_CHANNEL_SECRET: Boolean(process.env.LINE_CHANNEL_SECRET?.trim()),
+    NEXT_PUBLIC_APP_URL: Boolean(process.env.NEXT_PUBLIC_APP_URL?.trim()),
+  };
+
   return Response.json({
     service: "ecobz-crm-line-webhook",
     status: configured ? "ready" : "missing_env",
     webhook_url: webhookUrl,
+    env_status: envStatus,
+    hint: configured
+      ? "POST from LINE should return 200 when signature is valid."
+      : "Set missing env vars on the host, then redeploy. LINE verify needs 200 on POST.",
     env_required: [
       "LINE_CHANNEL_ACCESS_TOKEN",
       "LINE_CHANNEL_SECRET",
