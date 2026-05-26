@@ -1,3 +1,4 @@
+import { publishLineMessage, publishLineUser } from "./publish-realtime";
 import { getLineUserProfile } from "./messaging-api";
 import { saveInboundMessage, upsertLineUser } from "./store";
 import {
@@ -38,12 +39,13 @@ async function processEvent(event: LineWebhookBody["events"][number]): Promise<b
 
   if (event.type === "follow") {
     const profile = await getLineUserProfile(userId);
-    await upsertLineUser({
+    const user = await upsertLineUser({
       user_id: userId,
       display_name: profile.displayName,
       picture_url: profile.pictureUrl ?? null,
       status_message: profile.statusMessage ?? null,
     });
+    publishLineUser(user);
     return true;
   }
 
@@ -60,20 +62,22 @@ async function handleMessageEvent(
   userId: string,
 ): Promise<void> {
   const profile = await getLineUserProfile(userId);
-  await upsertLineUser({
+  const user = await upsertLineUser({
     user_id: userId,
     display_name: profile.displayName,
     picture_url: profile.pictureUrl ?? null,
     status_message: profile.statusMessage ?? null,
   });
+  publishLineUser(user);
 
   const { text, messageType, stickerId } = messageEventToText(event.message);
 
-  await saveInboundMessage({
+  const saved = await saveInboundMessage({
     user_id: userId,
     message_text: text,
     message_type: messageType,
     sticker_id: stickerId ?? null,
     reply_token: event.replyToken ?? null,
   });
+  publishLineMessage(saved);
 }

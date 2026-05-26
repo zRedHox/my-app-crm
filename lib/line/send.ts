@@ -1,3 +1,4 @@
+import { publishLineMessage } from "./publish-realtime";
 import { pushTextMessage } from "./messaging-api";
 import { saveOutboundMessage } from "./store";
 
@@ -7,5 +8,6 @@ export async function sendLineChatMessage(
   text: string,
 ): Promise<void> {
   await pushTextMessage(userId, text);
-  await saveOutboundMessage({ user_id: userId, message_text: text });
+  const saved = await saveOutboundMessage({ user_id: userId, message_text: text });
+  publishLineMessage(saved);
 }

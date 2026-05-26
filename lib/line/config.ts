@@ -5,9 +5,18 @@ export function getWebhookUrl(appBaseUrl: string): string {
   return `${appBaseUrl.replace(/\/$/, "")}${LINE_WEBHOOK_PATH}`;
 }
 
-export const LINE_POLL_INTERVAL_MS = Number(
-  process.env.NEXT_PUBLIC_LINE_POLL_INTERVAL_MS ?? 10_000,
+/** Poll when Chat Center tab is visible */
+export const LINE_POLL_ACTIVE_MS = Number(
+  process.env.NEXT_PUBLIC_LINE_POLL_ACTIVE_MS ?? 3_000,
 );
+
+/** Poll when tab is hidden (fallback) */
+export const LINE_POLL_IDLE_MS = Number(
+  process.env.NEXT_PUBLIC_LINE_POLL_IDLE_MS ?? 30_000,
+);
+
+/** @deprecated use LINE_POLL_ACTIVE_MS */
+export const LINE_POLL_INTERVAL_MS = LINE_POLL_ACTIVE_MS;
 
 /** Inbox: recent messages loaded on Chat Center open (keep small for speed) */
 export const LINE_INBOX_FETCH_LIMIT = Number(

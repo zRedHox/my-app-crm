@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LINE_POLL_INTERVAL_MS } from "@/lib/line/config";
+import {
+  LINE_POLL_ACTIVE_MS,
+  LINE_POLL_IDLE_MS,
+} from "@/lib/line/config";
 import { buildLineConversations } from "@/lib/line/conversations";
 import {
   fetchLineMessagesForUser,
@@ -11,7 +14,9 @@ import { sendLineChatMessageFromClient } from "@/lib/line/send-client";
 import { listLineMessages, listLineUsers } from "@/lib/line/store";
 import type { LineConversation } from "@/lib/line/types";
 import type { LineMessageOut, LineUserOut } from "@/lib/line/types";
+import type { LineRealtimeEvent } from "@/lib/line/realtime-events";
 import { ApiError } from "@/lib/api/client";
+import { useLineRealtime } from "@/hooks/use-line-realtime";
 
 function conversationsWithThreadHistory(
   users: LineUserOut[],
@@ -35,6 +40,16 @@ function conversationsWithThreadHistory(
   return buildLineConversations(users, allMessages);
 }
 
+function upsertUser(users: LineUserOut[], user: LineUserOut): LineUserOut[] {
+  const i = users.findIndex((u) => u.user_id === user.user_id);
+  if (i >= 0) {
+    const next = [...users];
+    next[i] = { ...next[i], ...user };
+    return next;
+  }
+  return [...users, user];
+}
+
 export function useLineChat() {
   const [conversations, setConversations] = useState<LineConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +69,36 @@ export function useLineChat() {
       ),
     );
   }, []);
+
+  const applyRealtimeMessage = useCallback(
+    (message: LineMessageOut) => {
+      inboxRef.current = mergeLineMessages(inboxRef.current, [message]);
+      const cached = threadHistoryRef.current.get(message.user_id);
+      if (cached) {
+        threadHistoryRef.current.set(
+          message.user_id,
+          mergeLineMessages(cached, [message]),
+        );
+      }
+      rebuild();
+    },
+    [rebuild],
+  );
+
+  const handleRealtime = useCallback(
+    (event: LineRealtimeEvent) => {
+      if (event.type === "line:message") {
+        applyRealtimeMessage(event.message);
+      }
+      if (event.type === "line:user") {
+        usersRef.current = upsertUser(usersRef.current, event.user);
+        rebuild();
+      }
+    },
+    [applyRealtimeMessage, rebuild],
+  );
+
+  const { connected: realtimeConnected } = useLineRealtime(handleRealtime);
 
   const load = useCallback(async () => {
     try {
@@ -106,8 +151,31 @@ export function useLineChat() {
   }, [load]);
 
   useEffect(() => {
-    const id = window.setInterval(() => void load(), LINE_POLL_INTERVAL_MS);
-    return () => clearInterval(id);
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const startPoll = () => {
+      if (interval) clearInterval(interval);
+      const ms =
+        document.visibilityState === "visible"
+          ? LINE_POLL_ACTIVE_MS
+          : LINE_POLL_IDLE_MS;
+      interval = setInterval(() => {
+        if (document.visibilityState === "visible") void load();
+      }, ms);
+    };
+
+    startPoll();
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+      startPoll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [load]);
 
   const sendMessage = useCallback(
@@ -115,7 +183,6 @@ export function useLineChat() {
       setSending(true);
       try {
         await sendLineChatMessageFromClient(lineUserId, text);
-        await load();
         await loadThreadHistory(lineUserId);
       } catch (err) {
         const msg =
@@ -126,7 +193,7 @@ export function useLineChat() {
         setSending(false);
       }
     },
-    [load, loadThreadHistory],
+    [loadThreadHistory],
   );
 
   return {
@@ -135,6 +202,7 @@ export function useLineChat() {
     threadLoading,
     error,
     sending,
+    realtimeConnected,
     refresh: load,
     sendMessage,
     loadThreadHistory,

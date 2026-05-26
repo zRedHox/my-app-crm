@@ -13,7 +13,8 @@ webhook-handler.ts
 
 Chat Center
     │ send → LINE push API + save outbound message
-    ├── poll backend for inbox (recent messages)
+    ├── SSE `/api/line/events` — push new messages (works with `next start`, no custom server)
+    ├── poll every 3s when tab visible (fallback)
     └── on open thread → load full history for that user (merge, never replace)
 ```
 
