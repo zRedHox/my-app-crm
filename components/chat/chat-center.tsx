@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Loader2, RefreshCw, Send } from "lucide-react";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { useLineChat } from "@/hooks/use-line-chat";
@@ -27,7 +27,7 @@ type ConversationItem =
   | { source: "mock"; data: (typeof chatConversations)[number] };
 
 export function ChatCenter() {
-  const [filter, setFilter] = useState<ChatPlatform | "all">("line");
+  const [filter, setFilter] = useState<ChatPlatform | "all">("all");
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState("");
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -35,13 +35,11 @@ export function ChatCenter() {
   const {
     conversations: lineConversations,
     loading: lineLoading,
-    threadLoading,
     error: lineError,
     sending,
     realtimeConnected,
     refresh,
     sendMessage,
-    loadThreadHistory,
   } = useLineChat();
 
   const mockFiltered =
@@ -54,7 +52,11 @@ export function ChatCenter() {
 
   const listItems: ConversationItem[] = [
     ...lineFiltered.map((data) => ({ source: "line" as const, data })),
-    ...mockFiltered.map((data) => ({ source: "mock" as const, data })),
+    ...(filter === "all"
+      ? chatConversations
+          .filter((c) => c.platform !== "line")
+          .map((data) => ({ source: "mock" as const, data }))
+      : mockFiltered.map((data) => ({ source: "mock" as const, data }))),
   ];
 
   const activeLine = lineConversations.find((c) => c.id === selectedId);
@@ -70,12 +72,6 @@ export function ChatCenter() {
   const activeId = selectedId || (isDesktop ? defaultId : "");
   const isLineActive = Boolean(activeLine && activeLine.id === activeId);
   const isMockActive = Boolean(activeMock && activeMock.id === activeId);
-
-  useEffect(() => {
-    if (activeLine?.lineUserId) {
-      void loadThreadHistory(activeLine.lineUserId);
-    }
-  }, [activeLine?.lineUserId, loadThreadHistory]);
 
   async function handleSend() {
     if (!draft.trim() || !activeLine || sending) return;
@@ -148,19 +144,9 @@ export function ChatCenter() {
             <Loader2 className="h-6 w-6 animate-spin text-[#1d4ed8]" />
           </div>
         ) : listItems.length === 0 ? (
-          <div className="px-4 py-12 text-center text-sm text-slate-500">
-            <p>No LINE conversations yet.</p>
-            <p className="mt-2 text-xs">
-              {lineError
-                ? "Could not load from server — check login and API URL."
-                : "Messages appear when LINE webhook receives events."}
-            </p>
-            {filter === "line" && (
-              <p className="mt-3 text-xs text-slate-400">
-                TikTok & Facebook are mock-only — use those filters to preview.
-              </p>
-            )}
-          </div>
+          <p className="px-4 py-12 text-center text-sm text-slate-500">
+            No conversations yet. Messages appear when LINE webhook receives events.
+          </p>
         ) : (
           <ul className="flex-1 overflow-y-auto scroll-thin">
             {listItems.map((item) => {
@@ -175,12 +161,7 @@ export function ChatCenter() {
                         activeId === conv.id ? "bg-blue-50" : ""
                       }`}
                     >
-                      <Avatar
-                        initials={conv.avatar}
-                        src={conv.pictureUrl}
-                        alt={conv.customerName}
-                        size="md"
-                      />
+                      <Avatar initials={conv.avatar} size="md" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate font-medium text-slate-900">
@@ -261,13 +242,9 @@ export function ChatCenter() {
           <ThreadHeader
             name={activeLine.customerName}
             platform="line"
-            initials={activeLine.avatar}
-            pictureUrl={activeLine.pictureUrl}
             onBack={() => setSelectedId("")}
           />
           <MessageList
-            scrollKey={`${activeLine.id}-${activeLine.messages.length}-${activeLine.messages.at(-1)?.id ?? ""}`}
-            loading={threadLoading}
             messages={activeLine.messages.map((m) => ({
               id: m.id,
               text: m.text,
@@ -295,7 +272,7 @@ export function ChatCenter() {
             platform={activeMock.platform}
             onBack={() => setSelectedId("")}
           />
-          <MessageList scrollKey={activeMock.id} messages={activeMock.messages} />
+          <MessageList messages={activeMock.messages} />
           <ComposeBar
             value={draft}
             onChange={setDraft}
@@ -316,19 +293,12 @@ export function ChatCenter() {
 function ThreadHeader({
   name,
   platform,
-  initials,
-  pictureUrl,
   onBack,
 }: {
   name: string;
   platform: ChatPlatform;
-  initials?: string;
-  pictureUrl?: string | null;
   onBack: () => void;
 }) {
-  const fallbackInitials =
-    initials ?? name.slice(0, 2).toUpperCase();
-
   return (
     <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
       <button
@@ -338,12 +308,7 @@ function ThreadHeader({
       >
         ← Back
       </button>
-      <Avatar
-        initials={fallbackInitials}
-        src={pictureUrl}
-        alt={name}
-        size="md"
-      />
+      <Avatar initials={name.slice(0, 2).toUpperCase()} />
       <div>
         <p className="font-medium text-slate-900">{name}</p>
         <Badge className={`mt-0.5 text-[10px] ${platformColors[platform]}`}>
@@ -356,41 +321,11 @@ function ThreadHeader({
 
 function MessageList({
   messages,
-  scrollKey,
-  loading,
 }: {
   messages: { id: string; text: string; sender: string; timestamp: string }[];
-  /** Changes when switching conversations — triggers scroll to latest */
-  scrollKey?: string;
-  loading?: boolean;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const scrollToBottom = () => {
-      const el = containerRef.current;
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-      }
-      bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
-    };
-    scrollToBottom();
-    const t = requestAnimationFrame(scrollToBottom);
-    return () => cancelAnimationFrame(t);
-  }, [scrollKey, messages.length, messages[messages.length - 1]?.id]);
-
   return (
-    <div
-      ref={containerRef}
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto scroll-thin"
-    >
-      <div className="space-y-3 p-4">
-      {loading && messages.length === 0 ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-[#1d4ed8]" />
-        </div>
-      ) : null}
+    <div className="flex-1 space-y-3 overflow-y-auto p-4 scroll-thin">
       {messages.map((msg) => (
         <div
           key={msg.id}
@@ -414,8 +349,6 @@ function MessageList({
           </div>
         </div>
       ))}
-      <div ref={bottomRef} aria-hidden className="h-px shrink-0" />
-      </div>
     </div>
   );
 }

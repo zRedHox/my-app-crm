@@ -14,8 +14,7 @@ webhook-handler.ts
 Chat Center
     │ send → LINE push API + save outbound message
     ├── SSE `/api/line/events` — push new messages (works with `next start`, no custom server)
-    ├── poll every 3s when tab visible (fallback)
-    └── on open thread → load full history for that user (merge, never replace)
+    └── poll every 3s when tab visible (fallback)
 ```
 
 ## Setup
@@ -47,21 +46,21 @@ Check: open `https://crm.ecobz.team/api/line/webhook` — you want `"status":"re
 PM2 does **not** read `.env.local` from your laptop. On the **server**, in the app folder:
 
 ```bash
-cd /var/www/my-app-crm
 cp .env.example .env.production
-nano .env.production   # LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, NEXT_PUBLIC_APP_URL
-node scripts/check-line-env.cjs   # must exit 0
+nano .env.production   # paste LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, NEXT_PUBLIC_APP_URL, etc.
 npm run build
 pm2 delete my-app-crm 2>/dev/null || true
-pm2 flush
 pm2 start ecosystem.config.cjs
 pm2 save
-pm2 logs my-app-crm --lines 30
 ```
 
-If PM2 shows **errored** / restart loop: old config may still use `npm` or `node --env-file` (needs Node 20.6+). Pull latest `ecosystem.config.cjs` — it loads `.env.production` without `--env-file`.
+Confirm env reached the process (no secrets printed, only true/false):
 
-After start you should see in logs: `[ecosystem] .env.production loaded — LINE token: true secret: true`
+```bash
+node --env-file=.env.production -e "console.log('token', !!process.env.LINE_CHANNEL_ACCESS_TOKEN, 'secret', !!process.env.LINE_CHANNEL_SECRET)"
+```
+
+If that prints `token true secret true` but the app still fails, you started PM2 with `npm start` instead of `ecosystem.config.cjs` — use the ecosystem file so `--env-file` is applied.
 
 ### Local dev with ngrok
 
@@ -81,6 +80,7 @@ ngrok http 3000
 | `store.ts` | Backend persistence |
 | `send.ts` | Outbound from Chat Center |
 | `app/api/line/webhook/route.ts` | HTTP endpoint |
+| `app/api/line/events/route.ts` | SSE for Chat Center live updates |
 
 ## Security
 

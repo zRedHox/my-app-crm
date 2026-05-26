@@ -42,17 +42,6 @@ function initials(name: string): string {
   );
 }
 
-export function lineMessagesToChatMessages(
-  messages: LineMessageOut[],
-): LineChatMessage[] {
-  return [...messages]
-    .sort(
-      (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-    )
-    .map(toChatMessage);
-}
-
 export function buildLineConversations(
   users: LineUserOut[],
   messages: LineMessageOut[],
@@ -89,7 +78,7 @@ export function buildLineConversations(
         unread: sorted.filter(
           (m) => messageSender(m) === "customer" && !m.is_read,
         ).length,
-        messages: lineMessagesToChatMessages(sorted),
+        messages: sorted.map(toChatMessage),
       },
     });
   }

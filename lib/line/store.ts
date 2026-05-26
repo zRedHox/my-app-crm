@@ -3,10 +3,10 @@
  */
 import { apiClient } from "@/lib/api/client";
 import {
+  LINE_MESSAGES_FETCH_LIMIT,
   LINE_PROVIDER_INBOUND,
   LINE_PROVIDER_OUTBOUND,
 } from "./config";
-import { fetchRecentLineMessages } from "./messages-loader";
 import type { LineMessageOut, LineUserOut } from "./types";
 
 const PREFIX = "/api/v1/line";
@@ -16,7 +16,12 @@ export async function listLineUsers(): Promise<LineUserOut[]> {
 }
 
 export async function listLineMessages(): Promise<LineMessageOut[]> {
-  return fetchRecentLineMessages();
+  const qs = new URLSearchParams({
+    limit: String(LINE_MESSAGES_FETCH_LIMIT),
+  });
+  return apiClient<LineMessageOut[]>(`${PREFIX}/messages?${qs}`, {
+    auth: false,
+  });
 }
 
 export async function upsertLineUser(data: {

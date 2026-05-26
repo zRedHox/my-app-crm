@@ -6,38 +6,27 @@ import {
   LINE_POLL_IDLE_MS,
 } from "@/lib/line/config";
 import { buildLineConversations } from "@/lib/line/conversations";
-import {
-  fetchLineMessagesForUser,
-  mergeLineMessages,
-} from "@/lib/line/messages-loader";
 import { sendLineChatMessageFromClient } from "@/lib/line/send-client";
 import { listLineMessages, listLineUsers } from "@/lib/line/store";
-import type { LineConversation } from "@/lib/line/types";
-import type { LineMessageOut, LineUserOut } from "@/lib/line/types";
+import type {
+  LineConversation,
+  LineMessageOut,
+  LineUserOut,
+} from "@/lib/line/types";
 import type { LineRealtimeEvent } from "@/lib/line/realtime-events";
 import { ApiError } from "@/lib/api/client";
 import { useLineRealtime } from "@/hooks/use-line-realtime";
 
-function conversationsWithThreadHistory(
-  users: LineUserOut[],
-  inboxMessages: LineMessageOut[],
-  threadHistory: Map<string, LineMessageOut[]>,
-): LineConversation[] {
-  const mergedByUser = new Map<string, LineMessageOut[]>();
-
-  for (const msg of inboxMessages) {
-    const list = mergedByUser.get(msg.user_id) ?? [];
-    list.push(msg);
-    mergedByUser.set(msg.user_id, list);
-  }
-
-  for (const [userId, history] of threadHistory) {
-    const inbox = mergedByUser.get(userId) ?? [];
-    mergedByUser.set(userId, mergeLineMessages(inbox, history));
-  }
-
-  const allMessages = [...mergedByUser.values()].flat();
-  return buildLineConversations(users, allMessages);
+function mergeLineMessages(
+  existing: LineMessageOut[],
+  incoming: LineMessageOut[],
+): LineMessageOut[] {
+  const byId = new Map<number, LineMessageOut>();
+  for (const m of existing) byId.set(m.id, m);
+  for (const m of incoming) byId.set(m.id, m);
+  return [...byId.values()].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
 }
 
 function upsertUser(users: LineUserOut[], user: LineUserOut): LineUserOut[] {
@@ -53,33 +42,20 @@ function upsertUser(users: LineUserOut[], user: LineUserOut): LineUserOut[] {
 export function useLineChat() {
   const [conversations, setConversations] = useState<LineConversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [threadLoading, setThreadLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const threadHistoryRef = useRef<Map<string, LineMessageOut[]>>(new Map());
   const usersRef = useRef<LineUserOut[]>([]);
-  const inboxRef = useRef<LineMessageOut[]>([]);
+  const messagesRef = useRef<LineMessageOut[]>([]);
 
   const rebuild = useCallback(() => {
     setConversations(
-      conversationsWithThreadHistory(
-        usersRef.current,
-        inboxRef.current,
-        threadHistoryRef.current,
-      ),
+      buildLineConversations(usersRef.current, messagesRef.current),
     );
   }, []);
 
   const applyRealtimeMessage = useCallback(
     (message: LineMessageOut) => {
-      inboxRef.current = mergeLineMessages(inboxRef.current, [message]);
-      const cached = threadHistoryRef.current.get(message.user_id);
-      if (cached) {
-        threadHistoryRef.current.set(
-          message.user_id,
-          mergeLineMessages(cached, [message]),
-        );
-      }
+      messagesRef.current = mergeLineMessages(messagesRef.current, [message]);
       rebuild();
     },
     [rebuild],
@@ -107,7 +83,7 @@ export function useLineChat() {
         listLineMessages(),
       ]);
       usersRef.current = users;
-      inboxRef.current = messages;
+      messagesRef.current = messages;
       rebuild();
       setError(null);
     } catch (err) {
@@ -118,33 +94,6 @@ export function useLineChat() {
       setLoading(false);
     }
   }, [rebuild]);
-
-  const loadThreadHistory = useCallback(
-    async (lineUserId: string) => {
-      const inboxForUser = inboxRef.current.filter(
-        (m) => m.user_id === lineUserId,
-      );
-      if (inboxForUser.length > 0) {
-        threadHistoryRef.current.set(lineUserId, inboxForUser);
-        rebuild();
-      }
-
-      setThreadLoading(true);
-      try {
-        const history = await fetchLineMessagesForUser(lineUserId);
-        threadHistoryRef.current.set(
-          lineUserId,
-          mergeLineMessages(inboxForUser, history),
-        );
-        rebuild();
-      } catch {
-        /* poll will retry */
-      } finally {
-        setThreadLoading(false);
-      }
-    },
-    [rebuild],
-  );
 
   useEffect(() => {
     void load();
@@ -183,7 +132,7 @@ export function useLineChat() {
       setSending(true);
       try {
         await sendLineChatMessageFromClient(lineUserId, text);
-        await loadThreadHistory(lineUserId);
+        await load();
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : "Failed to send LINE message";
@@ -193,18 +142,16 @@ export function useLineChat() {
         setSending(false);
       }
     },
-    [loadThreadHistory],
+    [load],
   );
 
   return {
     conversations,
     loading,
-    threadLoading,
     error,
     sending,
     realtimeConnected,
     refresh: load,
     sendMessage,
-    loadThreadHistory,
   };
 }
