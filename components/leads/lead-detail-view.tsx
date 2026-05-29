@@ -21,16 +21,15 @@ import { ButtonLink } from "@/components/ui/button";
 import { deleteLead, getLead } from "@/lib/api/leads";
 import { ApiError } from "@/lib/api/client";
 import type { LeadOut } from "@/lib/api/types";
-import {
-  formatLeadDate,
-  statusColors,
-  statusLabels,
-} from "@/lib/mock-data";
+import { formatLeadDate } from "@/lib/mock-data";
+import { usePipelineStages } from "@/hooks/use-pipeline-stages";
 import {
   getLeadDisplayName,
   getLeadInitials,
   getLeadValue,
 } from "@/lib/leads/display";
+import { LeadTagsSection } from "@/components/tags/lead-tags-section";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 export function LeadDetailView({ leadId }: { leadId: string }) {
   const router = useRouter();
@@ -38,6 +37,8 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { isAdmin } = useIsAdmin();
+  const { labels: statusLabels, colors: statusColors } = usePipelineStages();
 
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +166,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
                     <span className="text-sm text-slate-500">· {lead.source}</span>
                   )}
                 </div>
+                <LeadTagsSection leadId={leadId} lineId={lead.line_id} isAdmin={isAdmin} />
                 <p className="mt-3 text-2xl font-bold text-slate-900">{getLeadValue(lead)}</p>
                 <p className="text-sm text-slate-500">Budget / deal value</p>
               </div>

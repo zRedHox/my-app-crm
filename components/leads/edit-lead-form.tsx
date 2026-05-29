@@ -17,14 +17,11 @@ import {
   leadToFormDefaults,
   type LeadFormErrors,
 } from "@/lib/leads/form";
-import { budgetRanges, productInterests, statusLabels } from "@/lib/mock-data";
+import { budgetRanges, productInterests } from "@/lib/mock-data";
+import { usePipelineStages } from "@/hooks/use-pipeline-stages";
 
 const budgetOptions = budgetRanges.map((b) => ({ value: b.value, label: b.label }));
 const productOptions = productInterests.map((p) => ({ value: p, label: p }));
-const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({
-  value,
-  label,
-}));
 
 interface EditLeadFormProps {
   lead: LeadOut;
@@ -32,6 +29,8 @@ interface EditLeadFormProps {
 
 export function EditLeadForm({ lead }: EditLeadFormProps) {
   const router = useRouter();
+  const { stages } = usePipelineStages();
+  const statusOptions = stages.map((s) => ({ value: s.id, label: s.label }));
   const defaults = leadToFormDefaults(lead);
   const [errors, setErrors] = useState<LeadFormErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);

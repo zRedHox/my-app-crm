@@ -9,7 +9,7 @@ export default function LoginPage() {
           <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
             <Logo size="lg" />
           </div>
-          <p className="text-sm text-blue-100">Organization CRM — Mock-up Phase</p>
+          <p className="text-sm text-blue-100">Organization CRM</p>
         </div>
 
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl sm:p-8">

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight, Loader2, LogIn } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,13 +12,13 @@ import { getMe } from "@/lib/api/users";
 import { ApiError } from "@/lib/api/client";
 import type { LeadOut } from "@/lib/api/types";
 import { isAuthenticated } from "@/lib/auth/token";
-import { statusColors, statusLabels } from "@/lib/mock-data";
 import {
   getLeadDisplayName,
   getLeadInitials,
   getLeadSubtitle,
   getLeadValue,
 } from "@/lib/leads/display";
+import { usePipelineStages } from "@/hooks/use-pipeline-stages";
 
 interface LeadsListProps {
   search?: string;
@@ -27,6 +28,7 @@ interface LeadsListProps {
 }
 
 export function LeadsList({ search = "", refreshKey = "", onCountChange }: LeadsListProps) {
+  const router = useRouter();
   const [leads, setLeads] = useState<LeadOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,14 +158,22 @@ export function LeadsList({ search = "", refreshKey = "", onCountChange }: Leads
             </thead>
             <tbody className="divide-y divide-slate-100">
               {leads.map((lead) => (
-                <tr key={lead.id} className="group hover:bg-slate-50/50">
+                <tr
+                  key={lead.id}
+                  className="group cursor-pointer hover:bg-slate-50/50"
+                  tabIndex={0}
+                  onClick={() => router.push(`/leads/${lead.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(`/leads/${lead.id}`);
+                    }
+                  }}
+                >
                   <td className="px-5 py-3.5">
-                    <Link
-                      href={`/leads/${lead.id}`}
-                      className="font-medium text-slate-900 hover:text-[#1d4ed8]"
-                    >
+                    <span className="font-medium text-slate-900 group-hover:text-[#1d4ed8]">
                       {getLeadDisplayName(lead)}
-                    </Link>
+                    </span>
                   </td>
                   <td className="px-5 py-3.5 text-slate-600">{getLeadSubtitle(lead)}</td>
                   <td className="px-5 py-3.5">
@@ -175,12 +185,9 @@ export function LeadsList({ search = "", refreshKey = "", onCountChange }: Leads
                     {lead.product_interest ?? "—"}
                   </td>
                   <td className="px-5 py-3.5">
-                    <Link
-                      href={`/leads/${lead.id}`}
-                      className="inline-flex items-center gap-1 text-[#1d4ed8] opacity-0 transition group-hover:opacity-100"
-                    >
-                      View <ChevronRight className="h-4 w-4" />
-                    </Link>
+                    <span className="inline-flex items-center gap-1 text-[#1d4ed8] opacity-0 transition group-hover:opacity-100">
+                      <ChevronRight className="h-4 w-4" />
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -224,10 +231,11 @@ function LeadCard({ lead }: { lead: LeadOut }) {
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
+  const { labels, colors } = usePipelineStages();
   const key = status ?? "new";
   return (
-    <Badge className={statusColors[key] ?? statusColors.new}>
-      {statusLabels[key] ?? key}
+    <Badge className={colors[key] ?? colors.new}>
+      {labels[key] ?? key}
     </Badge>
   );
 }

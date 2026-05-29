@@ -4,6 +4,7 @@ import {
   Kanban,
   MessageCircle,
   Settings,
+  BriefcaseBusiness,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,5 +19,6 @@ export const mainNav: NavItem[] = [
   { label: "Leads", href: "/leads", icon: Users },
   { label: "Pipeline", href: "/pipeline", icon: Kanban },
   { label: "Chat Center", href: "/chat", icon: MessageCircle },
+  { label: "Back office", href: "/back-office", icon: BriefcaseBusiness },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   LINE_POLL_ACTIVE_MS,
   LINE_POLL_IDLE_MS,
@@ -8,73 +8,14 @@ import {
 import { buildLineConversations } from "@/lib/line/conversations";
 import { sendLineChatMessageFromClient } from "@/lib/line/send-client";
 import { listLineMessages, listLineUsers } from "@/lib/line/store";
-import type {
-  LineConversation,
-  LineMessageOut,
-  LineUserOut,
-} from "@/lib/line/types";
-import type { LineRealtimeEvent } from "@/lib/line/realtime-events";
+import type { LineConversation } from "@/lib/line/types";
 import { ApiError } from "@/lib/api/client";
-import { useLineRealtime } from "@/hooks/use-line-realtime";
-
-function mergeLineMessages(
-  existing: LineMessageOut[],
-  incoming: LineMessageOut[],
-): LineMessageOut[] {
-  const byId = new Map<number, LineMessageOut>();
-  for (const m of existing) byId.set(m.id, m);
-  for (const m of incoming) byId.set(m.id, m);
-  return [...byId.values()].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-  );
-}
-
-function upsertUser(users: LineUserOut[], user: LineUserOut): LineUserOut[] {
-  const i = users.findIndex((u) => u.user_id === user.user_id);
-  if (i >= 0) {
-    const next = [...users];
-    next[i] = { ...next[i], ...user };
-    return next;
-  }
-  return [...users, user];
-}
 
 export function useLineChat() {
   const [conversations, setConversations] = useState<LineConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const usersRef = useRef<LineUserOut[]>([]);
-  const messagesRef = useRef<LineMessageOut[]>([]);
-
-  const rebuild = useCallback(() => {
-    setConversations(
-      buildLineConversations(usersRef.current, messagesRef.current),
-    );
-  }, []);
-
-  const applyRealtimeMessage = useCallback(
-    (message: LineMessageOut) => {
-      messagesRef.current = mergeLineMessages(messagesRef.current, [message]);
-      rebuild();
-    },
-    [rebuild],
-  );
-
-  const handleRealtime = useCallback(
-    (event: LineRealtimeEvent) => {
-      if (event.type === "line:message") {
-        applyRealtimeMessage(event.message);
-      }
-      if (event.type === "line:user") {
-        usersRef.current = upsertUser(usersRef.current, event.user);
-        rebuild();
-      }
-    },
-    [applyRealtimeMessage, rebuild],
-  );
-
-  const { connected: realtimeConnected } = useLineRealtime(handleRealtime);
 
   const load = useCallback(async () => {
     try {
@@ -82,9 +23,7 @@ export function useLineChat() {
         listLineUsers(),
         listLineMessages(),
       ]);
-      usersRef.current = users;
-      messagesRef.current = messages;
-      rebuild();
+      setConversations(buildLineConversations(users, messages));
       setError(null);
     } catch (err) {
       setError(
@@ -93,7 +32,7 @@ export function useLineChat() {
     } finally {
       setLoading(false);
     }
-  }, [rebuild]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -150,7 +89,6 @@ export function useLineChat() {
     loading,
     error,
     sending,
-    realtimeConnected,
     refresh: load,
     sendMessage,
   };

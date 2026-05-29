@@ -14,6 +14,11 @@ import {
 } from "@/lib/mock-data";
 import type { ChatPlatform } from "@/lib/types";
 import type { LineConversation } from "@/lib/line/types";
+import { CustomerTagsPanel } from "@/components/tags/customer-tags-panel";
+import { TagList } from "@/components/tags/tag-list";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useCustomerTagsMap } from "@/hooks/use-customer-tags";
+import { customerTagKey } from "@/lib/tags/config";
 
 const filters: { id: ChatPlatform | "all"; label: string }[] = [
   { id: "all", label: "All" },
@@ -32,12 +37,14 @@ export function ChatCenter() {
   const [draft, setDraft] = useState("");
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
+  const { isAdmin } = useIsAdmin();
+  const customerTagsMap = useCustomerTagsMap();
+
   const {
     conversations: lineConversations,
     loading: lineLoading,
     error: lineError,
     sending,
-    realtimeConnected,
     refresh,
     sendMessage,
   } = useLineChat();
@@ -94,18 +101,10 @@ export function ChatCenter() {
       >
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
           <span
-            className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline ${
-              realtimeConnected
-                ? "bg-emerald-100 text-emerald-800"
-                : "bg-slate-100 text-slate-500"
-            }`}
-            title={
-              realtimeConnected
-                ? "Live updates (SSE)"
-                : "Polling every few seconds — sign in for live"
-            }
+            className="hidden shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 sm:inline"
+            title="Polling every few seconds"
           >
-            {realtimeConnected ? "Live" : "Poll"}
+            Poll
           </span>
           <div className="flex flex-1 gap-1.5 overflow-x-auto scroll-thin">
             {filters.map((f) => (
@@ -152,6 +151,8 @@ export function ChatCenter() {
             {listItems.map((item) => {
               if (item.source === "line") {
                 const conv = item.data;
+                const convTags =
+                  customerTagsMap[customerTagKey("line", conv.lineUserId)] ?? [];
                 return (
                   <li key={conv.id}>
                     <button
@@ -161,7 +162,12 @@ export function ChatCenter() {
                         activeId === conv.id ? "bg-blue-50" : ""
                       }`}
                     >
-                      <Avatar initials={conv.avatar} size="md" />
+                      <Avatar
+                        initials={conv.avatar}
+                        src={conv.pictureUrl}
+                        alt={conv.customerName}
+                        size="md"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate font-medium text-slate-900">
@@ -179,6 +185,9 @@ export function ChatCenter() {
                         <p className="mt-1 truncate text-xs text-slate-500">
                           {conv.lastMessage}
                         </p>
+                        {convTags.length > 0 && (
+                          <TagList tags={convTags} size="sm" maxVisible={2} className="mt-1.5" />
+                        )}
                       </div>
                       {conv.unread > 0 && (
                         <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
@@ -191,6 +200,7 @@ export function ChatCenter() {
               }
 
               const conv = item.data;
+              const mockTags = customerTagsMap[customerTagKey("mock", conv.id)] ?? [];
               return (
                 <li key={conv.id}>
                   <button
@@ -218,6 +228,9 @@ export function ChatCenter() {
                       <p className="mt-1 truncate text-xs text-slate-500">
                         {conv.lastMessage}
                       </p>
+                      {mockTags.length > 0 && (
+                        <TagList tags={mockTags} size="sm" maxVisible={2} className="mt-1.5" />
+                      )}
                     </div>
                     {conv.unread > 0 && (
                       <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
@@ -242,7 +255,11 @@ export function ChatCenter() {
           <ThreadHeader
             name={activeLine.customerName}
             platform="line"
+            initials={activeLine.avatar}
+            pictureUrl={activeLine.pictureUrl}
             onBack={() => setSelectedId("")}
+            customerKey={customerTagKey("line", activeLine.lineUserId)}
+            isAdmin={isAdmin}
           />
           <MessageList
             messages={activeLine.messages.map((m) => ({
@@ -271,6 +288,8 @@ export function ChatCenter() {
             name={activeMock.customerName}
             platform={activeMock.platform}
             onBack={() => setSelectedId("")}
+            customerKey={customerTagKey("mock", activeMock.id)}
+            isAdmin={isAdmin}
           />
           <MessageList messages={activeMock.messages} />
           <ComposeBar
@@ -293,28 +312,46 @@ export function ChatCenter() {
 function ThreadHeader({
   name,
   platform,
+  initials,
+  pictureUrl,
   onBack,
+  customerKey,
+  isAdmin,
 }: {
   name: string;
   platform: ChatPlatform;
+  initials?: string;
+  pictureUrl?: string | null;
   onBack: () => void;
+  customerKey: string;
+  isAdmin: boolean;
 }) {
+  const fallbackInitials = initials ?? name.slice(0, 2).toUpperCase();
+
   return (
-    <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-sm text-[#1d4ed8] md:hidden"
-      >
-        ← Back
-      </button>
-      <Avatar initials={name.slice(0, 2).toUpperCase()} />
-      <div>
-        <p className="font-medium text-slate-900">{name}</p>
-        <Badge className={`mt-0.5 text-[10px] ${platformColors[platform]}`}>
-          {platformLabels[platform]}
-        </Badge>
+    <div className="border-b border-slate-100">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-sm text-[#1d4ed8] md:hidden"
+        >
+          ← Back
+        </button>
+        <Avatar
+          initials={fallbackInitials}
+          src={pictureUrl}
+          alt={name}
+          size="md"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-slate-900">{name}</p>
+          <Badge className={`mt-0.5 text-[10px] ${platformColors[platform]}`}>
+            {platformLabels[platform]}
+          </Badge>
+        </div>
       </div>
+      <CustomerTagsPanel customerKey={customerKey} isAdmin={isAdmin} compact />
     </div>
   );
 }

@@ -13,8 +13,7 @@ webhook-handler.ts
 
 Chat Center
     │ send → LINE push API + save outbound message
-    ├── SSE `/api/line/events` — push new messages (works with `next start`, no custom server)
-    └── poll every 3s when tab visible (fallback)
+    └── poll every 3s when tab visible
 ```
 
 ## Setup
@@ -80,7 +79,6 @@ ngrok http 3000
 | `store.ts` | Backend persistence |
 | `send.ts` | Outbound from Chat Center |
 | `app/api/line/webhook/route.ts` | HTTP endpoint |
-| `app/api/line/events/route.ts` | SSE for Chat Center live updates |
 
 ## Security
 
